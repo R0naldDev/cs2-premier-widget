@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>CS2 Premier Widget</title>
+<style>
+  :root { --fg:#eaeaea; --muted:#9aa0a6; --accent:#f84982; }
+  * { box-sizing: border-box; }
+  body { margin:0; font: 500 16px/1.2 system-ui,Segoe UI,Roboto,Arial; color:var(--fg); background:transparent; }
+  .card {
+    display:flex; align-items:center; gap:12px;
+    background: linear-gradient(135deg, rgba(15,15,18,.85), rgba(15,15,18,.55));
+    border:1px solid rgba(255,255,255,.08); padding:14px 16px; border-radius:16px;
+    backdrop-filter: blur(6px);
+  }
+  .avatar { width:48px; height:48px; border-radius:12px; object-fit:cover; border:1px solid rgba(255,255,255,.15); }
+  .col { display:flex; flex-direction:column; gap:4px; }
+  .name { font-size:15px; opacity:.95; }
+  .rating { font-size:28px; font-weight:800; letter-spacing:.5px; }
+  .delta { font-size:13px; color:var(--muted); }
+  .delta.positive { color:#00c853; }
+  .delta.negative { color:#ff5252; }
+  .rank { font-size:13px; color:var(--muted); }
+  .footer { display:flex; align-items:center; gap:8px; margin-left:auto; font-size:12px; color:var(--muted); }
+  .leetify { color:var(--accent); text-decoration:none; font-weight:700; }
+  .small { font-size:11px; }
+</style>
+</head>
+<body>
+  <div class="card" id="card">
+    <img class="avatar" id="avatar" src="" alt="avatar" />
+    <div class="col">
+      <div class="name" id="name">Cargando…</div>
+      <div class="rating" id="rating">—</div>
+      <div class="rank" id="rank">—</div>
+      <div class="delta" id="delta">—</div>
+    </div>
+    <div class="footer">
+      <span class="small">Data Provided by</span>
+      <a class="leetify" id="leetifyLink" href="https://leetify.com/" target="_blank" rel="noopener">Leetify</a>
+      <span>•</span>
+      <a class="leetify" id="viewLink" href="#" target="_blank" rel="noopener">View on Leetify</a>
+    </div>
+  </div>
+
+<script>
+const STEAM_ID = "76561198844188625"; // tu SteamID64
+// En Vercel la función vive en /api/... bajo el mismo dominio
+const PROXY_URL = "/api/cs2/" + STEAM_ID;
+const REFRESH_MS = 60 * 1000;
+
+async function load() {
+  try {
+    const r = await fetch(PROXY_URL, { cache: "no-store" });
+    if (!r.ok) throw new Error(await r.text());
+    const d = await r.json();
+
+    document.getElementById("name").textContent = d.name || "Jugador";
+    document.getElementById("avatar").src = d.avatarUrl || "https://avatars.steamstatic.com/0000000000000000000000000000000000000000_full.jpg";
+    document.getElementById("rating").textContent = d.rating ? d.rating.toLocaleString() : "—";
+    document.getElementById("rank").textContent = d.rankName ? `Premier: ${d.rankName}` : "Premier: —";
+
+    const deltaEl = document.getElementById("delta");
+    if (typeof d.ratingDelta === "number") {
+      const sign = d.ratingDelta > 0 ? "+" : "";
+      deltaEl.textContent = `Δ ${sign}${d.ratingDelta}`;
+      deltaEl.classList.toggle("positive", d.ratingDelta > 0);
+      deltaEl.classList.toggle("negative", d.ratingDelta < 0);
+    } else {
+      deltaEl.textContent = "Δ —";
+      deltaEl.classList.remove("positive","negative");
+    }
+
+    const view = d.profileUrl || "https://leetify.com/";
+    document.getElementById("viewLink").href = view;
+
+  } catch (err) {
+    document.getElementById("name").textContent = "Error cargando datos";
+    document.getElementById("rating").textContent = "—";
+    document.getElementById("rank").textContent = "—";
+    document.getElementById("delta").textContent = (err.message || "—").slice(0,140);
+  }
+}
+
+load();
+setInterval(load, REFRESH_MS);
+</script>
+</body>
+</html>
