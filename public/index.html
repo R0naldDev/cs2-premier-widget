@@ -1,101 +1,69 @@
 <!doctype html>
 <html lang="es">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>CS2 Premier Widget</title>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>CS2 Premier Widget (csstats)</title>
 <style>
-  :root { --fg:#eaeaea; --muted:#9aa0a6; --accent:#f84982; }
-  * { box-sizing: border-box; }
-  body { margin:0; font: 500 16px/1.2 system-ui,Segoe UI,Roboto,Arial; color:var(--fg); background:transparent; }
-  .card {
-    display:flex; align-items:center; gap:12px;
+  :root { --fg:#eaeaea; --muted:#9aa0a6; --accent:#4ade80; }
+  * { box-sizing: border-box }
+  body { margin:0; font:500 16px/1.2 system-ui,Segoe UI,Roboto,Arial; color:var(--fg); background:transparent }
+  .card { display:flex; align-items:center; gap:12px;
     background: linear-gradient(135deg, rgba(15,15,18,.85), rgba(15,15,18,.55));
-    border:1px solid rgba(255,255,255,.08); padding:14px 16px; border-radius:16px;
-    backdrop-filter: blur(6px);
-  }
+    border:1px solid rgba(255,255,255,.08); padding:14px 16px; border-radius:16px; backdrop-filter: blur(6px); }
   .avatar { width:48px; height:48px; border-radius:12px; object-fit:cover; border:1px solid rgba(255,255,255,.15); }
   .col { display:flex; flex-direction:column; gap:4px; }
   .name { font-size:15px; opacity:.95; }
   .rating { font-size:28px; font-weight:800; letter-spacing:.5px; }
-  .delta { font-size:13px; color:var(--muted); }
-  .delta.positive { color:#00c853; }
-  .delta.negative { color:#ff5252; }
-  .rank { font-size:13px; color:var(--muted); }
-  .footer { display:flex; align-items:center; gap:8px; margin-left:auto; font-size:12px; color:var(--muted); }
-  .leetify { color:var(--accent); text-decoration:none; font-weight:700; }
-  .small { font-size:11px; }
+  .sub { font-size:13px; color:var(--muted); }
+  .footer { margin-left:auto; font-size:12px; color:var(--muted); display:flex; gap:8px; align-items:center }
+  a { color:var(--accent); text-decoration:none; font-weight:700 }
 </style>
 </head>
 <body>
-  <div class="card" id="card">
-    <img class="avatar" id="avatar" src="" alt="avatar" />
+  <div class="card">
+    <img class="avatar" id="avatar" alt="avatar">
     <div class="col">
       <div class="name" id="name">Cargando…</div>
       <div class="rating" id="rating">—</div>
-      <div class="rank" id="rank">—</div>
-      <div class="delta" id="delta">—</div>
+      <div class="sub" id="best">—</div>
+      <div class="sub" id="season">—</div>
     </div>
     <div class="footer">
-      <span class="small">Data Provided by</span>
-      <a class="leetify" id="leetifyLink" href="https://leetify.com/" target="_blank" rel="noopener">Leetify</a>
-      <span>•</span>
-      <a class="leetify" id="viewLink" href="#" target="_blank" rel="noopener">View on Leetify</a>
+      <span>Data: </span><a id="src" target="_blank" rel="noopener">csstats.gg</a>
     </div>
   </div>
 
 <script>
-const STEAM_ID = "76561198844188625";
-const PROXY_URL = "/api/cs2/" + STEAM_ID;
-const REFRESH_MS = 60 * 1000;
+const STEAM_ID = "76561198844188625"; // tu SteamID64
+const PROXY_URL = "/api/csstats/" + STEAM_ID;
+// refresco prudente (5 min). Si quieres menos, 60–120s, pero mejor respetar ToS.
+const REFRESH_MS = 5 * 60 * 1000;
 
 async function load() {
   try {
     const r = await fetch(PROXY_URL, { cache: "no-store" });
     const d = await r.json();
-
-    const nameEl = document.getElementById("name");
-    const ratingEl = document.getElementById("rating");
-    const rankEl = document.getElementById("rank");
-    const deltaEl = document.getElementById("delta");
-    const avatarEl = document.getElementById("avatar");
-    const viewLink = document.getElementById("viewLink");
-
     if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`);
 
-    if (!d.hasData) {
-      nameEl.textContent = d.name || "Sin datos de Leetify";
-      ratingEl.textContent = "—";
-      rankEl.textContent = "Premier: —";
-      deltaEl.textContent = "Conecta y sincroniza tu perfil en Leetify";
-      viewLink.href = d.profileUrl || `https://leetify.com/app/profile/${STEAM_ID}`;
-      return;
-    }
+    document.getElementById("name").textContent   = d.name || "Jugador";
+    document.getElementById("avatar").src         = d.avatarUrl || "https://avatars.steamstatic.com/0000000000000000000000000000000000000000_full.jpg";
+    document.getElementById("rating").textContent = d.rating ? d.rating.toLocaleString() : "—";
+    document.getElementById("best").textContent   = d.bestRating ? `Mejor: ${d.bestRating.toLocaleString()}` : "Mejor: —";
+    document.getElementById("season").textContent = d.season ? `Temporada: ${d.season}` : "Temporada: —";
 
-    nameEl.textContent = d.name || "Jugador";
-    avatarEl.src = d.avatarUrl || "https://avatars.steamstatic.com/0000000000000000000000000000000000000000_full.jpg";
-    ratingEl.textContent = d.rating ? d.rating.toLocaleString() : "—";
-    rankEl.textContent = d.rankName ? `Premier: ${d.rankName}` : "Premier: —";
-
-    if (typeof d.ratingDelta === "number") {
-      const sign = d.ratingDelta > 0 ? "+" : "";
-      deltaEl.textContent = `Δ ${sign}${d.ratingDelta}`;
-      deltaEl.classList.toggle("positive", d.ratingDelta > 0);
-      deltaEl.classList.toggle("negative", d.ratingDelta < 0);
-    } else {
-      deltaEl.textContent = "Δ —";
-      deltaEl.classList.remove("positive","negative");
-    }
-
-    viewLink.href = d.profileUrl || `https://leetify.com/app/profile/${STEAM_ID}`;
-
+    const a = document.getElementById("src");
+    a.href = d.profileUrl || `https://csstats.gg/player/${STEAM_ID}`;
+    a.textContent = "csstats.gg";
   } catch (err) {
     document.getElementById("name").textContent = "Error cargando datos";
     document.getElementById("rating").textContent = "—";
-    document.getElementById("rank").textContent = "—";
-    document.getElementById("delta").textContent = (err.message || "—").slice(0,140);
+    document.getElementById("best").textContent = (err.message || "—").slice(0, 140);
+    document.getElementById("season").textContent = "—";
+    document.getElementById("src").href = `https://csstats.gg/player/${STEAM_ID}`;
   }
 }
+
 load();
 setInterval(load, REFRESH_MS);
 </script>
