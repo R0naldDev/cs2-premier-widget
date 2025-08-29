@@ -8,17 +8,13 @@ module.exports = async (req, res) => {
   const { steamId } = req.query;
   if (!steamId) return res.status(400).json({ error: "Missing steamId" });
 
-  // Lista de intentos (endpoints y nombres de parámetro posibles).
+  // El endpoint correcto usa "identifiers=".
+  // Probamos varias formas habituales por si el Swagger cambia el alias:
+  const base = "https://api-public.cs-prod.leetify.com/v3/profile";
   const attempts = [
-    // lo que usamos al inicio
-    `https://api-public.cs-prod.leetify.com/v3/profile?steamId=${encodeURIComponent(steamId)}`,
-    // variantes comunes
-    `https://api-public.cs-prod.leetify.com/v3/profile?steamId64=${encodeURIComponent(steamId)}`,
-    `https://api-public.cs-prod.leetify.com/v3/profile?id=${encodeURIComponent(steamId)}`,
-    // formato tipo "identifiers"
-    `https://api-public.cs-prod.leetify.com/v3/profile?identifiers=steamId:${encodeURIComponent(steamId)}`,
-    // fallback a otra ruta plausible
-    `https://api-public.cs-prod.leetify.com/v3/player?steamId=${encodeURIComponent(steamId)}`
+    `${base}?identifiers=steamId64:${encodeURIComponent(steamId)}`,
+    `${base}?identifiers=steamId:${encodeURIComponent(steamId)}`,
+    `${base}?identifiers=steam:${encodeURIComponent(steamId)}`
   ];
 
   let lastStatus = 0, lastBody = "";
@@ -30,49 +26,46 @@ module.exports = async (req, res) => {
       const text = await r.text();
       lastBody = text;
 
-      // Si responde 200, intentamos parsear y normalizar
-      if (r.ok) {
-        let data;
-        try { data = JSON.parse(text); } catch { data = {}; }
-        const p = data?.player ?? data ?? {};
-        const premier = p?.cs2?.premier ?? p?.premier ?? {};
-        const links = p?.links ?? data?.links ?? {};
+      if (!r.ok) continue;
 
-        // Si no hay nada de premier/rating, seguimos probando:
-        if (premier?.rating == null && attempts[attempts.length - 1] !== url) {
-          continue;
-        }
+      let data = {};
+      try { data = JSON.parse(text); } catch {}
 
-        let ratingDelta = null;
-        if (premier?.lastDelta != null) ratingDelta = premier.lastDelta;
-        if (ratingDelta == null && Array.isArray(p?.recentGames)) {
-          ratingDelta = p.recentGames?.[0]?.ratingDelta ?? null;
-        }
+      // Normalización defensiva
+      const p = data?.player ?? data ?? {};
+      const premier = p?.cs2?.premier ?? p?.premier ?? {};
+      const links = p?.links ?? data?.links ?? {};
 
-        const normalized = {
-          name: p?.name ?? "",
-          avatarUrl: p?.avatarUrl ?? "",
-          rating: premier?.rating ?? null,
-          rankName: premier?.rankName ?? null,
-          ratingDelta,
-          lastMatchAt: p?.lastMatchAt ?? null,
-          profileUrl: links?.leetify || p?.profileUrl || `https://leetify.com/app/profile/${steamId}`,
-          hasData: Boolean(premier?.rating != null),
-          used: url
-        };
-
-        res.setHeader("Cache-Control", "public, max-age=60, s-maxage=60, stale-while-revalidate=30");
-        return res.status(200).json(normalized);
+      let ratingDelta = null;
+      if (premier?.lastDelta != null) ratingDelta = premier.lastDelta;
+      if (ratingDelta == null && Array.isArray(p?.recentGames)) {
+        ratingDelta = p.recentGames?.[0]?.ratingDelta ?? null;
       }
+
+      const normalized = {
+        name: p?.name ?? "",
+        avatarUrl: p?.avatarUrl ?? "",
+        rating: premier?.rating ?? null,       // CS Rating (Premier)
+        rankName: premier?.rankName ?? null,
+        ratingDelta,
+        lastMatchAt: p?.lastMatchAt ?? null,
+        profileUrl: links?.leetify || p?.profileUrl || `https://leetify.com/app/profile/${steamId}`,
+        hasData: Boolean(premier?.rating != null),
+        used: url
+      };
+
+      res.setHeader("Cache-Control", "public, max-age=60, s-maxage=60, stale-while-revalidate=30");
+      return res.status(200).json(normalized);
     }
 
-    // Si ninguna opción fue 200 o no hubo rating
-    console.error("Leetify last response", lastStatus, lastBody?.slice(0, 400));
+    // Ningún intento funcionó
+    console.error("Leetify last response", lastStatus, (lastBody || "").slice(0, 400));
     return res.status(lastStatus || 502).json({
       error: "Leetify did not return usable data",
       status: lastStatus,
-      body: lastBody?.slice(0, 400)
+      body: (lastBody || "").slice(0, 400)
     });
+
   } catch (e) {
     console.error("Handler exception", e);
     return res.status(500).json({ error: e.message || "Unknown error" });
