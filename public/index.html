@@ -45,23 +45,38 @@
   </div>
 
 <script>
-const STEAM_ID = "76561198844188625"; // tu SteamID64
-// En Vercel la función vive en /api/... bajo el mismo dominio
+const STEAM_ID = "76561198844188625";
 const PROXY_URL = "/api/cs2/" + STEAM_ID;
 const REFRESH_MS = 60 * 1000;
 
 async function load() {
   try {
     const r = await fetch(PROXY_URL, { cache: "no-store" });
-    if (!r.ok) throw new Error(await r.text());
     const d = await r.json();
 
-    document.getElementById("name").textContent = d.name || "Jugador";
-    document.getElementById("avatar").src = d.avatarUrl || "https://avatars.steamstatic.com/0000000000000000000000000000000000000000_full.jpg";
-    document.getElementById("rating").textContent = d.rating ? d.rating.toLocaleString() : "—";
-    document.getElementById("rank").textContent = d.rankName ? `Premier: ${d.rankName}` : "Premier: —";
-
+    const nameEl = document.getElementById("name");
+    const ratingEl = document.getElementById("rating");
+    const rankEl = document.getElementById("rank");
     const deltaEl = document.getElementById("delta");
+    const avatarEl = document.getElementById("avatar");
+    const viewLink = document.getElementById("viewLink");
+
+    if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`);
+
+    if (!d.hasData) {
+      nameEl.textContent = d.name || "Sin datos de Leetify";
+      ratingEl.textContent = "—";
+      rankEl.textContent = "Premier: —";
+      deltaEl.textContent = "Conecta y sincroniza tu perfil en Leetify";
+      viewLink.href = d.profileUrl || `https://leetify.com/app/profile/${STEAM_ID}`;
+      return;
+    }
+
+    nameEl.textContent = d.name || "Jugador";
+    avatarEl.src = d.avatarUrl || "https://avatars.steamstatic.com/0000000000000000000000000000000000000000_full.jpg";
+    ratingEl.textContent = d.rating ? d.rating.toLocaleString() : "—";
+    rankEl.textContent = d.rankName ? `Premier: ${d.rankName}` : "Premier: —";
+
     if (typeof d.ratingDelta === "number") {
       const sign = d.ratingDelta > 0 ? "+" : "";
       deltaEl.textContent = `Δ ${sign}${d.ratingDelta}`;
@@ -72,8 +87,7 @@ async function load() {
       deltaEl.classList.remove("positive","negative");
     }
 
-    const view = d.profileUrl || "https://leetify.com/";
-    document.getElementById("viewLink").href = view;
+    viewLink.href = d.profileUrl || `https://leetify.com/app/profile/${STEAM_ID}`;
 
   } catch (err) {
     document.getElementById("name").textContent = "Error cargando datos";
@@ -82,7 +96,6 @@ async function load() {
     document.getElementById("delta").textContent = (err.message || "—").slice(0,140);
   }
 }
-
 load();
 setInterval(load, REFRESH_MS);
 </script>
